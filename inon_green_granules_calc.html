@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>原料換算 INON GREEN GRANULES</title>
+<style>
+  :root{
+    --ink:#1f2a24;
+    --paper:#f6f4ee;
+    --line:#c9c2b2;
+    --accent:#3f6b4a;
+    --accent-dark:#2c4d34;
+    --danger:#8a3b2b;
+    --danger-dark:#6e2e21;
+    --cell:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding:24px 16px 60px;
+  }
+  .wrap{
+    max-width:720px;
+    margin:0 auto;
+  }
+  h1{
+    font-size:1.4rem;
+    letter-spacing:0.04em;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:12px;
+    margin-bottom:6px;
+  }
+  .sub{
+    font-size:0.85rem;
+    color:#5b5346;
+    margin-bottom:24px;
+  }
+  .card{
+    background:var(--cell);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:18px 18px 20px;
+    margin-bottom:18px;
+  }
+  .card h2{
+    font-size:1rem;
+    margin:0 0 14px;
+    color:var(--accent-dark);
+  }
+  label{
+    display:block;
+    font-size:0.85rem;
+    margin-bottom:4px;
+    color:#3a352c;
+  }
+  input[type=number]{
+    width:100%;
+    padding:8px 10px;
+    border:1px solid var(--line);
+    border-radius:4px;
+    font-size:1rem;
+    background:#fffef9;
+    margin-bottom:12px;
+  }
+  input[type=number]:focus{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+  }
+  .row{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .row > div{
+    flex:1 1 140px;
+  }
+  .analysis-block{
+    border:1px dashed var(--line);
+    border-radius:5px;
+    padding:12px 14px 2px;
+    margin-bottom:14px;
+    background:#fbfaf5;
+  }
+  .analysis-block .idx{
+    font-weight:600;
+    font-size:0.9rem;
+    margin-bottom:8px;
+    color:var(--accent-dark);
+  }
+  button{
+    font-size:0.95rem;
+    padding:10px 18px;
+    border-radius:5px;
+    border:none;
+    cursor:pointer;
+    font-weight:600;
+    letter-spacing:0.02em;
+  }
+  .btn-primary{
+    background:var(--accent);
+    color:#fff;
+  }
+  .btn-primary:hover{background:var(--accent-dark);}
+  .btn-clear{
+    background:var(--danger);
+    color:#fff;
+  }
+  .btn-clear:hover{background:var(--danger-dark);}
+  .btn-bar{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    margin-top:6px;
+    flex-wrap:wrap;
+  }
+  .hidden{display:none;}
+  table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:10px;
+    font-size:0.9rem;
+  }
+  th,td{
+    border:1px solid var(--line);
+    padding:8px 6px;
+    text-align:center;
+  }
+  th{
+    background:#eee8d8;
+    color:var(--accent-dark);
+  }
+  .note{
+    font-size:0.8rem;
+    color:#7a7263;
+    margin-top:10px;
+  }
+  .error{
+    color:var(--danger-dark);
+    font-size:0.85rem;
+    margin-top:6px;
+  }
+  .fixed-clear{
+    position:fixed;
+    top:16px;
+    right:16px;
+  }
+  @media (max-width:480px){
+    .fixed-clear{position:static;display:block;margin-bottom:14px;text-align:right;}
+  }
+</style>
+</head>
+<body>
+
+<div class="fixed-clear">
+  <button class="btn-clear" id="clearAllBtn">清除全部</button>
+</div>
+
+<div class="wrap">
+  <h1>原料換算 INON GREEN GRANULES</h1>
+  <div class="sub">依分析號碼數量輸入使用量／含量％／水份％，自動回推標準值與最後一組使用量。</div>
+
+  <!-- Step 1: 輸入 Y -->
+  <div class="card" id="stepY">
+    <h2>步驟一：分析號碼數量</h2>
+    <label for="yInput">請輸入該分析號碼數量</label>
+    <input type="number" id="yInput" min="1" step="1" placeholder="例如：1 或 3">
+    <div class="btn-bar">
+      <button class="btn-primary" id="genFormBtn">產生輸入欄位</button>
+    </div>
+    <div class="error" id="yError"></div>
+  </div>
+
+  <!-- Step 2: 動態輸入欄位 -->
+  <div class="card hidden" id="stepInputs">
+    <h2>步驟二：輸入各分析號碼數值</h2>
+    <div id="inputsContainer"></div>
+    <div class="btn-bar">
+      <button class="btn-primary" id="calcBtn">計算</button>
+    </div>
+    <div class="error" id="calcError"></div>
+  </div>
+
+  <!-- Step 3: 結果 -->
+  <div class="card hidden" id="stepResult">
+    <h2>計算結果</h2>
+    <div id="resultArea"></div>
+    <div class="note">標準總量固定為 2400，換算比例固定為 4.19。</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const yInput = document.getElementById('yInput');
+  const yError = document.getElementById('yError');
+  const genFormBtn = document.getElementById('genFormBtn');
+
+  const stepY = document.getElementById('stepY');
+  const stepInputs = document.getElementById('stepInputs');
+  const stepResult = document.getElementById('stepResult');
+
+  const inputsContainer = document.getElementById('inputsContainer');
+  const calcBtn = document.getElementById('calcBtn');
+  const calcError = document.getElementById('calcError');
+  const resultArea = document.getElementById('resultArea');
+
+  const clearAllBtn = document.getElementById('clearAllBtn');
+
+  const STD_TOTAL = 2400;
+  const RATIO = 4.19;
+
+  let Y = 0;
+
+  // ---------- 步驟一 → 產生欄位 ----------
+  genFormBtn.addEventListener('click', function(){
+    yError.textContent = '';
+    const val = parseInt(yInput.value, 10);
+
+    if(!val || val < 1){
+      yError.textContent = '請輸入大於等於 1 的整數。';
+      return;
+    }
+    Y = val;
+    buildInputForm(Y);
+
+    stepInputs.classList.remove('hidden');
+    stepResult.classList.add('hidden');
+    resultArea.innerHTML = '';
+    calcError.textContent = '';
+    // 鎖定 Y，避免與已產生欄位不一致
+    yInput.disabled = true;
+    genFormBtn.disabled = true;
+  });
+
+  function buildInputForm(y){
+    inputsContainer.innerHTML = '';
+
+    if(y === 1){
+      const block = document.createElement('div');
+      block.className = 'analysis-block';
+      block.innerHTML = `
+        <div class="idx">第 1 個分析號碼</div>
+        <div class="row">
+          <div>
+            <label>含量 %</label>
+            <input type="number" step="any" class="content-input" data-i="0">
+          </div>
+          <div>
+            <label>水份 %</label>
+            <input type="number" step="any" class="water-input" data-i="0">
+          </div>
+        </div>
+      `;
+      inputsContainer.appendChild(block);
+      return;
+    }
+
+    // Y > 1：前 Y-1 個要輸入 使用量／含量／水份，最後一個只輸入 含量／水份
+    for(let i = 0; i < y - 1; i++){
+      const block = document.createElement('div');
+      block.className = 'analysis-block';
+      block.innerHTML = `
+        <div class="idx">第 ${i+1} 個分析號碼</div>
+        <div class="row">
+          <div>
+            <label>使用量</label>
+            <input type="number" step="any" class="usage-input" data-i="${i}">
+          </div>
+          <div>
+            <label>含量 %</label>
+            <input type="number" step="any" class="content-input" data-i="${i}">
+          </div>
+          <div>
+            <label>水份 %</label>
+            <input type="number" step="any" class="water-input" data-i="${i}">
+          </div>
+        </div>
+      `;
+      inputsContainer.appendChild(block);
+    }
+
+    const lastIdx = y - 1;
+    const lastBlock = document.createElement('div');
+    lastBlock.className = 'analysis-block';
+    lastBlock.innerHTML = `
+      <div class="idx">第 ${lastIdx+1} 個分析號碼（最後一個，使用量由系統回推）</div>
+      <div class="row">
+        <div>
+          <label>含量 %</label>
+          <input type="number" step="any" class="content-input" data-i="${lastIdx}">
+        </div>
+        <div>
+          <label>水份 %</label>
+          <input type="number" step="any" class="water-input" data-i="${lastIdx}">
+        </div>
+      </div>
+    `;
+    inputsContainer.appendChild(lastBlock);
+  }
+
+  // ---------- 步驟二 → 計算 ----------
+  calcBtn.addEventListener('click', function(){
+    calcError.textContent = '';
+    resultArea.innerHTML = '';
+
+    try{
+      if(Y === 1){
+        const content = getVal('content-input', 0, true);
+        const water = getVal('water-input', 0, true);
+
+        const usage = STD_TOTAL * (RATIO / content) * (100 / (100 - water));
+
+        resultArea.innerHTML = `
+          <table>
+            <thead>
+              <tr><th>分析號碼</th><th>含量%</th><th>水份%</th><th>使用量</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td>${content.toFixed(2)}</td>
+                <td>${water.toFixed(2)}</td>
+                <td>${usage.toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+      } else {
+        const a = [];
+        for(let i = 0; i < Y; i++){
+          a.push({usage:0, content:0, water:0, std:0});
+        }
+
+        for(let i = 0; i < Y - 1; i++){
+          a[i].usage = getVal('usage-input', i, true);
+          a[i].content = getVal('content-input', i, true);
+          a[i].water = getVal('water-input', i, true);
+        }
+        const last = Y - 1;
+        a[last].content = getVal('content-input', last, true);
+        a[last].water = getVal('water-input', last, true);
+
+        let sum = 0;
+        for(let i = 0; i < Y - 1; i++){
+          a[i].std = a[i].usage * ((100 - a[i].water) / 100) * (a[i].content / RATIO);
+          sum += a[i].std;
+        }
+
+        a[last].std = STD_TOTAL - sum;
+        a[last].usage = a[last].std * (RATIO / a[last].content) * (100 / (100 - a[last].water));
+
+        let rows = '';
+        for(let i = 0; i < Y; i++){
+          rows += `
+            <tr>
+              <td>${i+1}</td>
+              <td>${a[i].usage.toFixed(3)}</td>
+              <td>${a[i].content.toFixed(2)}</td>
+              <td>${a[i].water.toFixed(2)}</td>
+              <td>${a[i].std.toFixed(2)}</td>
+            </tr>
+          `;
+        }
+
+        resultArea.innerHTML = `
+          <p>n-1 個標準值之 sum 值為：${sum.toFixed(2)}</p>
+          <p>最後一個分析號碼的標準值為：${a[last].std.toFixed(2)}</p>
+          <p>最後一個分析號碼之使用量為：${a[last].usage.toFixed(3)}</p>
+          <table>
+            <thead>
+              <tr><th>分析號碼</th><th>使用量</th><th>含量%</th><th>水份%</th><th>標準值</th></tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        `;
+      }
+
+      stepResult.classList.remove('hidden');
+    } catch(err){
+      calcError.textContent = err.message || '輸入有誤，請檢查所有欄位是否已填寫且為有效數字。';
+    }
+  });
+
+  function getVal(className, index, required){
+    const el = inputsContainer.querySelector(`.${className}[data-i="${index}"]`);
+    const raw = el ? el.value.trim() : '';
+    if(raw === ''){
+      throw new Error('請完整填寫所有欄位後再計算。');
+    }
+    const num = parseFloat(raw);
+    if(isNaN(num)){
+      throw new Error('請輸入有效的數字。');
+    }
+    return num;
+  }
+
+  // ---------- 清除全部 ----------
+  // 邏輯重點：
+  // 1. 清空 Y 輸入框、解除鎖定，回到步驟一。
+  // 2. 移除所有動態產生的分析號碼輸入欄位（避免下次輸入不同 Y 時殘留舊欄位）。
+  // 3. 清空計算結果與所有錯誤訊息。
+  // 4. 隱藏步驟二、步驟三的卡片，只留步驟一可見。
+  // 5. 重設內部變數 Y，避免計算時誤用舊的分析號碼數量。
+  clearAllBtn.addEventListener('click', function(){
+    // 重設內部狀態
+    Y = 0;
+
+    // 重設步驟一
+    yInput.value = '';
+    yInput.disabled = false;
+    yError.textContent = '';
+    genFormBtn.disabled = false;
+
+    // 清空並隱藏步驟二
+    inputsContainer.innerHTML = '';
+    calcError.textContent = '';
+    stepInputs.classList.add('hidden');
+
+    // 清空並隱藏步驟三
+    resultArea.innerHTML = '';
+    stepResult.classList.add('hidden');
+
+    // 焦點回到 Y 輸入框，方便下一次輸入
+    yInput.focus();
+  });
+})();
+</script>
+
+</body>
+</html>
